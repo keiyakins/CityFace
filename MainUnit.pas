@@ -49,8 +49,7 @@ var
 	hStarImg: LongWord;
 	Player: TPlayerData;
 	FrameRate, SmoothedFrameRate: TReal;
-	Building: TBuildingData;
-
+	Buildings: array [0..8] of TBuildingData;
 
 
 procedure FirstInit;
@@ -61,6 +60,45 @@ function GetSDLFlags: LongWord;
 begin
 	Result := SDL_INIT_VIDEO;
 	//Flags := Flags or SDL_INIT_AUDIO;
+end;
+
+procedure NewBuildings;
+var
+	Building: TBuildingData;
+begin
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(-25,0,-25));
+	Buildings[0] := Building;
+
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(-25,0,0));
+	Buildings[1] := Building;
+
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(-25,0,25));
+	Buildings[2] := Building;
+
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(0,0,-25));
+	Buildings[3] := Building;
+
+	Buildings[4] := CubistTumorBuilding();
+
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(0,0,25));
+	Buildings[5] := Building;
+
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(25,0,-25));
+	Buildings[6] := Building;
+
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(25,0,0));
+	Buildings[7] := Building;
+
+	Building := GenericBuilding();
+	OffsetBuilding(Building, Vector(25,0,25));
+	Buildings[8] := Building;
 end;
 
 procedure InitGame;
@@ -146,7 +184,7 @@ begin
 	SetBoundTexture(0);
 
 	KeyData := TKeyData.Create;
-	Building := CubistTumorBuilding();
+	NewBuildings();
 end;
 
 procedure CleanupGame;
@@ -170,8 +208,7 @@ begin
 		SDL_QUITEV: Done := True;
 		SDL_KEYDOWN: begin
 			if (event.key.keysym.sym = SDLK_Escape) and (KeyData.BuckyState = []) then Done := True;
-			if (event.key.keysym.sym = SDLK_Return) and (KeyData.BuckyState = []) then Building := CubistTumorBuilding();
-			if (event.key.keysym.sym = SDLK_Return) and (KeyData.BuckyState = [bkShift]) then Building := GenericBuilding();
+			if (event.key.keysym.sym = SDLK_Return) and (KeyData.BuckyState = []) then NewBuildings();
 			//if (event.key.keysym.sym = SDLK_S) and (KeyData.BuckyState = [bkCtrl]) then Player.DoSaveClick(event.key.keysym.sym);
 			if event.key.keysym.sym < 512 then KeyData[event.key.keysym.sym] := True;
 		end;
@@ -370,9 +407,11 @@ begin
 	glPopMatrix;}
 	
 	glPushMatrix;
-		glTranslatef(0, -25, -100);
+		glTranslatef(0, -25, -200);
 		gldYaw(Rot);
-		RenderBuilding(Building);
+		for I := 0 to length(Buildings) do begin
+			RenderBuilding(Buildings[I]);
+		end;
 	glPopMatrix;
 
 	glDisable(GL_LIGHTING);
@@ -387,5 +426,4 @@ begin
 
 	SDL_GL_SwapBuffers();
 end;
-
 end.
