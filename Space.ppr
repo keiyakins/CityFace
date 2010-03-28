@@ -1,0 +1,71 @@
+program Space;
+
+uses
+	SysUtils,
+	SDL,
+	MainUnit;
+
+{
+procedure HandleException(E: Exception);
+var
+	MBText, MBCaption: String;
+
+begin
+	MBText := E.Message;
+	MBCaption := E.ClassName;
+	MessageBox(0, PChar(MBText), PChar(MBCaption), MB_ICONEXCLAMATION);
+	MBText := '';
+	MBCaption := '';
+end;
+}
+
+procedure HandleException(E: Exception);
+begin
+	WriteLn(E.ClassName + ': ' + E.Message);
+end;
+
+
+
+begin
+	try
+		FirstInit;
+
+		if SDL_Init(GetSDLFlags) < 0 then
+			WriteLn('SDL_Init failed.')
+		else try
+
+			SDL_ShowCursor(SDL_DISABLE);
+
+			//Set minimums for OpenGL.
+			SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8); //Try to force same video mode as my desktop.
+			SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+			SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+			SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 1);
+			SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, SDL_ENABLE);
+
+			Screen := SDL_SetVideoMode(0, 0, 0, SDL_OPENGL or SDL_NOFRAME {or SDL_FULLSCREEN});
+			if Screen = nil then begin
+				WriteLn('SDL_SetVideoMode failed.');
+				Exit;
+			end;
+
+			InitGame;
+
+			LastTime := SDL_GetTicks;
+			repeat
+				DoPhysics(DoTime);
+
+				DoGraphics;
+			until Done;
+
+			CleanupGame;
+
+		finally
+			SDL_ShowCursor(SDL_ENABLE);
+			SDL_FreeSurface(Screen);
+			SDL_Quit;
+		end;
+	except
+		on E: Exception do HandleException(E);
+	end;
+end.
