@@ -205,7 +205,7 @@ var
 begin
 	ThisBlock.nX := -10;
 	ThisBlock.xX := +10;
-	ThisBlock.xY := Round(64 - RandReal*60);
+	ThisBlock.xY := Round(34 - RandReal*30);
 	ThisBlock.nZ := -10;
 	ThisBlock.xZ := +10;
 	MakePoliesFromBlock(Result.PolyData, ThisBlock);
