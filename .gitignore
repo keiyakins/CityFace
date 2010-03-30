@@ -2,4 +2,6 @@
 *.ppu
 *.exe
 *.dll
-*.ccfCityFace
+*.ccf
+CityFace
+*~
