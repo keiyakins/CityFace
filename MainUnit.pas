@@ -29,7 +29,12 @@ implementation
 
 uses
 	SysUtils, Math,
-	GL, GLD, GLPNG,
+	{$IFDEF Linux}
+		NixRandomity,
+	{$ELSE}
+		MTRandomity,
+	{$ENDIF}
+	GL, GLD, GLImages,
 	DUtils, D3Vectors,
 	SpaceTextures,
 	Buildings;
@@ -44,12 +49,19 @@ type
 		Rot, TarRot: TReal;
 	end;
 
+	TActivity = (acNone, acSleep, acShop, acHeal, acMission);
+
+	TCityBlockData = record
+		PropertyValue: Byte;
+		Activity: TActivity;
+		Building: TBuildingData;
+	end;
+
 var
 	Rot: TReal;
-	hStarImg: LongWord;
 	Player: TPlayerData;
 	FrameRate, SmoothedFrameRate: TReal;
-	Buildings: array [0..8] of TBuildingData;
+	CityBlock: array[-20..20, -20..20] of TCityBlockData;
 
 
 procedure FirstInit;
@@ -62,49 +74,151 @@ begin
 	//Flags := Flags or SDL_INIT_AUDIO;
 end;
 
+procedure GenProcTextures;
+const
+	kBlack: TRGBAColor = ( R: 0; G: 0; B: 0; A: 255 );
+
+var
+	ThisImage, ThatImage: TGLImage;
+	I, X, Y, dX, dY, eX, eY: Integer;
+	M, nM, ThatLight: TReal;
+	C: TRGBAColor;
+	Lights: array[0..19, 0..19] of TReal;
+
+begin
+	ThisImage := TGLImage.Create;
+	ThatImage := TGLImage.Create;
+	ThisImage.Resize(256, 256, kBlack);
+	ThatImage.Resize(256, 256, kBlack);
+	//Random seed.
+	for Y := 0 to 255 do
+		for X := 0 to 255 do
+			ThatImage.GreyPixel[X, Y] := RandByte
+	;
+	//Blur.
+	for Y := 0 to 255 do
+		for X := 0 to 255 do
+			ThisImage.GreyPixel[X, Y] :=
+			( ThatImage.GreyPixel[X, Y]
+			+ ThatImage.GreyPixel[Byte(X + 255), Y]
+			+ ThatImage.GreyPixel[Byte(X + 1), Y]
+			+ ThatImage.GreyPixel[X, Byte(Y + 255)]
+			+ ThatImage.GreyPixel[X, Byte(Y + 1)]
+			+ 2) div 5
+	;
+	RoofTex := ThisImage.BakeToL;
+
+	//Darken.
+	for Y := 0 to 255 do
+		for X := 0 to 255 do
+			ThatImage.GreyPixel[X, Y] := ThisImage.GreyPixel[X, Y] shr 2
+	;
+	AsphaltTex := ThatImage.BakeToL;
+	FreeAndNil(ThatImage);
+
+	//Lighten.
+	for Y := 0 to 255 do
+		for X := 0 to 255 do
+			ThisImage.GreyPixel[X, Y] := (ThisImage.GreyPixel[X, Y] shr 1) or $80
+	;
+	//Bevel.
+	for Y := 0 to 255 do
+		for X := 0 to 7 do begin
+			if X >= Y then Continue;
+			if X >= 255-Y then Continue;
+			M := X*(1/8);
+			nM := 1 - M;
+			ThisImage.GreyPixel[X, Y] := Round(ThisImage.GreyPixel[X, Y]*M + 255*nM);
+			ThisImage.GreyPixel[255-X, Y] := Round(ThisImage.GreyPixel[255-X, Y]*M);
+			//I know, it's kinda lame, but I already had everything calculated...
+			ThisImage.GreyPixel[Y, X] := Round(ThisImage.GreyPixel[Y, X]*M + 255*nM);
+			ThisImage.GreyPixel[Y, 255-X] := Round(ThisImage.GreyPixel[Y, 255-X]*M);
+		end
+	;
+	for I := 0 to 7 do begin
+		M := I*(1/8);
+		nM := 1 - M;
+		ThisImage.GreyPixel[I, I] := Round(ThisImage.GreyPixel[I, I]*M + 255*nM);
+		ThisImage.GreyPixel[255-I, 255-I] := Round(ThisImage.GreyPixel[255-I, 255-I]*M);
+	end;
+	ConcreteTex := ThisImage.BakeToL;
+
+	ThisImage.Resize(160*3, 160*3, kBlack);
+	//Randomly assign light levels to windows.
+	for Y := 0 to 19 do
+		for X := 0 to 19 do
+			Lights[X, Y] := RandReal
+	;
+	//Repeatedly blur adjacent-window light levels.
+	for I := 1 to 6 do
+		for Y := 0 to 19 do begin
+			ThatLight := Lights[0, Y];
+			for X := 0 to 18 do begin
+				M := RandReal;
+				nM := 1 - M;
+				Lights[X, Y] := Lights[X, Y]*M + Lights[X+1, Y]*nM;
+			end;
+			M := RandReal;
+			nM := 1 - M;
+			Lights[19, Y] := Lights[19, Y]*M + ThatLight*nM;
+		end
+	;
+	//Mostly snap to on or off.
+	for Y := 0 to 19 do
+		for X := 0 to 19 do
+			Lights[X, Y] := Lights[X, Y]*0.4 + Ord(Lights[X, Y] >= 0.6)*0.6
+	;
+	//Final render. Upsampled for gluBuild2DMipmaps.
+	for Y := 0 to 19 do
+		for X := 0 to 19 do
+			for dY := 3 to 6 do
+				for dX := 1 to 6 do begin
+					M := Lights[X, Y]*(dY-3)*(1/3);
+					nM := Lights[X, Y]*(1 - M);
+					with C do begin
+						Color := (RandDWord and $01010101) * 255;
+						R := (R + A) shr 1;
+						G := (G + A) shr 1;
+						B := (B + A) shr 1;
+						R := Round(255*M + R*nM);
+						G := Round(255*M + G*nM);
+						B := Round(255*M + B*nM);
+						A := 255;
+					end;
+					for eY := 0 to 2 do
+						for eX := 0 to 2 do
+							ThisImage.Pixel[(X*8+dX)*3+eX, (Y*8+dY)*3+eY] := C
+					;
+				end
+	;
+	WindowedTex := ThisImage.BakeToRGBA;
+	FreeAndNil(ThisImage);
+end;
+
 procedure NewBuildings;
 var
-	Building: TBuildingData;
+	iX, iZ: Integer;
+
 begin
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(-25,0,-25));
-	Buildings[0] := Building;
+	for iX := Low(CityBlock) to High(CityBlock) do
+		for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
+			with CityBlock[iX, iZ] do begin
+				PropertyValue := 192 + RandN(20) - Abs(iX) - Abs(iZ);
 
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(-25,0,0));
-	Buildings[1] := Building;
-
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(-25,0,25));
-	Buildings[2] := Building;
-
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(0,0,-25));
-	Buildings[3] := Building;
-
-	Buildings[4] := CubistTumorBuilding();
-
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(0,0,25));
-	Buildings[5] := Building;
-
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(25,0,-25));
-	Buildings[6] := Building;
-
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(25,0,0));
-	Buildings[7] := Building;
-
-	Building := GenericBuilding();
-	OffsetBuilding(Building, Vector(25,0,25));
-	Buildings[8] := Building;
+				if PropertyValue > 200 then
+					Building := CubistTumorBuilding()
+				else
+					Building := GenericBuilding()
+				;
+				OffsetBuilding(Building, Vector(26*iX, 0, 26*iZ));
+			end
+	;
 end;
 
 procedure InitGame;
 const
-	NearClip = 1.0;
-	FarClip = NearClip * 1000;
+	NearClip = 0.5;
+	FarClip = NearClip * 4000;
 
 var
 	AspectRoot, iAspectRoot: TReal;
@@ -164,7 +278,8 @@ begin
 	//glLightfv(GL_LIGHT0, GL_DIFFUSE, InstantArrayPtr(0.5, 0.5, 0.5, 1));
 	//glLightfv(GL_LIGHT0, GL_SPECULAR, InstantArrayPtr(0.25, 0.25, 0.5, 1));
 
-	glLightfv(GL_LIGHT0, GL_POSITION, InstantArrayPtr(-7, 13, 15, 1));
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, InstantArrayPtr(1/3, 1/3, 1/3, 1));
+	glLightfv(GL_LIGHT0, GL_POSITION, InstantArrayPtr(-700, 1300, 1500, 1));
 
 	{
 	//Enable lighting.
@@ -179,12 +294,15 @@ begin
 
 	LoadTexFont(MyFont, 'Verdana.ccf');
 
-	{InitGLibAperture;
-	hStarImg := LoadRGBAPNG('Star.png');}
+	{
+	InitGLibAperture;
+	hStarImg := LoadRGBAPNG('Star.png');
+	}
+	GenProcTextures;
 	SetBoundTexture(0);
 
 	KeyData := TKeyData.Create;
-	NewBuildings();
+	NewBuildings;
 end;
 
 procedure CleanupGame;
@@ -246,8 +364,9 @@ begin
 	fdT := dT * 0.001;
 	FrameRate := 1 / fdT;
 	SmoothedFrameRate := SmoothedFrameRate * 0.9 + FrameRate * 0.1;
+	if fdT > 0.1 then fdT := 0.1;
 
-	Rot := Rot + fdT * 360/2;
+	Rot := Rot + fdT * 360/45;
 	if Rot >= 360 then Rot := Rot - 360;
 	Player.Rot := Player.Rot + fdT * 0.3;
 	if Player.Rot >= FullCircle then Player.Rot := Player.Rot - FullCircle;
@@ -354,71 +473,56 @@ const
 	SPF = 1 / (StarPlanes + 0.5);
 
 var
-	ES, EC: Extended;
-	Z, dX, dY: TReal;
-	I: Integer;
+	iX, iZ: Integer;
 
 begin
 	glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
-	{glDisable(GL_LIGHTING);
-	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	SetBoundTexture(hStarImg);
 	glColor3f(1, 1, 1);
-	SinCos(Player.Rot, ES, EC);
-	glBegin(GL_QUADS);
-		with Player.Loc do begin
-			dX := X - Floor(X);
-			dY := Y - Floor(Y);
-		end;
-		for I := 1 to StarPlanes do begin
-			Z := SqRt(1 - I * SPF) * 14;
-			glTexCoord2f(dX + 0, dY + 0); glVertex3f(-EC -ES, +EC -ES, -1);
-			glTexCoord2f(dX + 0, dY + Z); glVertex3f(-EC +ES, -EC -ES, -1);
-			glTexCoord2f(dX + Z, dY + Z); glVertex3f(+EC +ES, -EC +ES, -1);
-			glTexCoord2f(dX + Z, dY + 0); glVertex3f(+EC -ES, +EC +ES, -1);
-		end;
-	glEnd;
-	SetBoundTexture(0);
-	glDisable(GL_BLEND);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_LIGHTING);}
-
-	glColor3f(1, 1, 0);
-	glMaterialfv(GL_FRONT, GL_SPECULAR, InstantArrayPtr(1, 1, 1, 0));
-	glMaterialfv(GL_FRONT, GL_SHININESS, InstantArrayPtr(32));
-	SinCos(FullCircle / 3, ES, EC);
-	{glPushMatrix;
-		glTranslatef(0, 1, -10);
-		gldYaw(Rot);
-		DrawTriforce(ES, EC);
-	glPopMatrix;
 	glPushMatrix;
-		glTranslatef(ES, EC, -10);
+		glTranslatef(0, 0, -520/2);
+		gldPitch(-24);
 		gldYaw(Rot);
-		DrawTriforce(ES, EC);
-	glPopMatrix;
-	glPushMatrix;
-		glTranslatef(-ES, EC, -10);
-		gldYaw(Rot);
-		DrawTriforce(ES, EC);
-	glPopMatrix;}
-	
-	glPushMatrix;
-		glTranslatef(0, -25, -200);
-		gldYaw(Rot);
-		for I := 0 to length(Buildings) do begin
-			RenderBuilding(Buildings[I]);
-		end;
+		glDisable(GL_LIGHTING);
+		for iX := Low(CityBlock) to High(CityBlock) do
+			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
+				RenderBuildingWithStyle(CityBlock[iX, iZ].Building, [])
+		;
+		glEnable(GL_LIGHTING);
+		for iX := Low(CityBlock) to High(CityBlock) do
+			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
+				RenderBuildingWithStyle(CityBlock[iX, iZ].Building, [psLit])
+		;
+		{SetBoundTexture(AsphaltTex);
+		//SetBoundTexture(ConcreteTex);
+		glBegin(GL_QUADS);
+			glNormal3f(0, 1, 0);
+			glTexCoord2f(0, 1066);
+			glVertex3f(-533, 0, 533);
+			glTexCoord2f(1066, 1066);
+			glVertex3f(533, 0, 533);
+			glTexCoord2f(1066, 0);
+			glVertex3f(533, 0, -533);
+			glTexCoord2f(0, 0);
+			glVertex3f(-533, 0, -533);
+		glEnd;}
 	glPopMatrix;
 
 	glDisable(GL_LIGHTING);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
-	glColor3f(1, 1, 1);
+	if FrameRate < 10 then
+		glColor3f(1, 0, 0)
+	else
+		glColor3f(1, 1, 1)
+	;
 	PrintFPS(-15, +10, -30, FrameRate);
+	if SmoothedFrameRate < 10 then
+		glColor3f(1, 0, 0)
+	else
+		glColor3f(1, 1, 1)
+	;
 	PrintFPS(-15, +8, -30, SmoothedFrameRate);
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);

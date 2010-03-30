@@ -1,4 +1,4 @@
-program Space;
+program CityFace;
 
 uses
 	SysUtils,
@@ -43,7 +43,7 @@ begin
 			SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 1);
 			SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, SDL_ENABLE);
 
-			Screen := SDL_SetVideoMode(0, 0, 0, SDL_OPENGL or SDL_NOFRAME {or SDL_FULLSCREEN});
+			Screen := SDL_SetVideoMode(0, 0, 0, SDL_OPENGL or SDL_NOFRAME or SDL_FULLSCREEN);
 			if Screen = nil then begin
 				WriteLn('SDL_SetVideoMode failed.');
 				Exit;

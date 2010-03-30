@@ -17,7 +17,7 @@ type
 	TPolyData = record
 		A, B, C: TVertexData;
 		N: T3Vector;
-		Tex: Integer;
+		Tex: LongWord;
 		Style: TPolyStyles;
 	end;
 	TPolies = array of TPolyData;
@@ -30,6 +30,13 @@ function CubistTumorBuilding: TBuildingData;
 function GenericBuilding: TBuildingData;
 procedure OffsetBuilding(var Wot: TBuildingData; Delta: T3Vector);
 procedure RenderBuilding(const Wot: TBuildingData);
+procedure RenderBuildingWithStyle(const Wot: TBuildingData; TarStyle: TPolyStyles);
+
+var
+	WindowedTex: LongWord = 0;
+	RoofTex: LongWord = 0;
+	ConcreteTex: LongWord = 0;
+	AsphaltTex: LongWord = 0;
 
 
 
@@ -37,12 +44,13 @@ procedure RenderBuilding(const Wot: TBuildingData);
 implementation
 
 uses
+	{$IFDEF Linux}
+		NixRandomity,
+	{$ELSE}
+		MTRandomity,
+	{$ENDIF}
 	GL, GLD,
-	Solvation, MTRandomity;
-
-const
-	WindowedTex: LongWord = 0;
-	RoofTex: LongWord = 0;
+	Solvation;
 
 type
 	TBlockData = record
@@ -116,17 +124,53 @@ procedure MakePoliesFromBlock(var Polies: TPolies; Block: TBlockData);
 begin
 	with Block do begin
 		SetLength(Polies, 10);
-		SetPoliesFromQuad(Polies[0], Polies[1], Vector(nX, nY, nZ), Vector(nX, nY, xZ), Vector(nX, xY, nZ), Vector(nX, xY, xZ), Vector(-1, 0, 0), '.5-Z/20', 'Y/20', WindowedTex, [psLit]);
-		SetPoliesFromQuad(Polies[2], Polies[3], Vector(xX, nY, nZ), Vector(xX, nY, xZ), Vector(xX, xY, nZ), Vector(xX, xY, xZ), Vector(+1, 0, 0), '.5+Z/20', 'Y/20', WindowedTex, [psLit]);
-		SetPoliesFromQuad(Polies[4], Polies[5], Vector(nX, nY, xZ), Vector(xX, nY, xZ), Vector(nX, xY, xZ), Vector(xX, xY, xZ), Vector(0, 0, +1), '.5-X/20', 'Y/20', WindowedTex, [psLit]);
-		SetPoliesFromQuad(Polies[6], Polies[7], Vector(nX, nY, nZ), Vector(xX, nY, nZ), Vector(nX, xY, nZ), Vector(xX, xY, nZ), Vector(0, 0, -1), '.5+X/20', 'Y/20', WindowedTex, [psLit]);
+		SetPoliesFromQuad(Polies[0], Polies[1], Vector(nX, nY, nZ), Vector(nX, nY, xZ), Vector(nX, xY, nZ), Vector(nX, xY, xZ), Vector(-1, 0, 0), '.5-Z/20', 'Y/20', WindowedTex, []);
+		SetPoliesFromQuad(Polies[2], Polies[3], Vector(xX, nY, nZ), Vector(xX, nY, xZ), Vector(xX, xY, nZ), Vector(xX, xY, xZ), Vector(+1, 0, 0), '.5+Z/20', 'Y/20', WindowedTex, []);
+		SetPoliesFromQuad(Polies[4], Polies[5], Vector(nX, nY, xZ), Vector(xX, nY, xZ), Vector(nX, xY, xZ), Vector(xX, xY, xZ), Vector(0, 0, +1), '.5-X/20', 'Y/20', WindowedTex, []);
+		SetPoliesFromQuad(Polies[6], Polies[7], Vector(nX, nY, nZ), Vector(xX, nY, nZ), Vector(nX, xY, nZ), Vector(xX, xY, nZ), Vector(0, 0, -1), '.5+X/20', 'Y/20', WindowedTex, []);
 		SetPoliesFromQuad(Polies[8], Polies[9], Vector(nX, xY, nZ), Vector(nX, xY, xZ), Vector(xX, xY, nZ), Vector(xX, xY, xZ), Vector(0, +1, 0), '.5+X/20', '.5-Z/20', RoofTex, [psLit]);
+	end;
+end;
+
+procedure MakeSidewalk(var Polies: TPolies);
+var
+	CoreBlock: TBlockData;
+	I: Integer;
+
+begin
+	CoreBlock.nX := -11;
+	CoreBlock.xX := +11;
+	CoreBlock.nY := 0;
+	CoreBlock.xY := +0.05;
+	CoreBlock.nZ := -11;
+	CoreBlock.xZ := +11;
+	MakePoliesFromBlock(Polies, CoreBlock);
+	for I := 0 to High(Polies) do begin
+		Polies[I].Tex := ConcreteTex;
+		Polies[I].Style := [psLit];
+		with Polies[I].A do begin
+			U := U*20;
+			V := V*20;
+		end;
+		with Polies[I].B do begin
+			U := U*20;
+			V := V*20;
+		end;
+		with Polies[I].C do begin
+			U := U*20;
+			V := V*20;
+		end;
 	end;
 end;
 
 function CubistTumorBuilding: TBuildingData;
 
-	function Perturb(N: TReal): TReal;
+	function PerturbUp(N: TReal): TReal;
+	begin
+		Result := Round((RandReal*2 + 3)/6 * N);
+	end;
+
+	function PerturbSide(N: TReal): TReal;
 	begin
 		Result := Round((RandReal + 1)/3 * N);
 	end;
@@ -151,44 +195,48 @@ var
 	ThisBlockPolies: TPolies;
 
 begin
-	CoreBlock.nX := -9 + RandN(7);
-	CoreBlock.xX := +9 - RandN(7);
+	MakeSidewalk(Result.PolyData);
+
+	CoreBlock.nX := -9 + Integer(RandN(7));
+	CoreBlock.xX := +9 - Integer(RandN(7));
 	CoreBlock.nY := 0;
-	CoreBlock.xY := +64 - RandN(7);
-	CoreBlock.nZ := -9 + RandN(7);
-	CoreBlock.xZ := +9 - RandN(7);
-	MakePoliesFromBlock(Result.PolyData, CoreBlock);
+	CoreBlock.xY := +64 - Integer(RandN(7));
+	CoreBlock.nZ := -9 + Integer(RandN(7));
+	CoreBlock.xZ := +9 - Integer(RandN(7));
+	MakePoliesFromBlock(ThisBlockPolies, CoreBlock);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
 	ThisBlock.nY := 0;
 	ThisBlock.nX := -10;
 	ThisBlock.xX := CoreBlock.nX;
-	ThisBlock.xY := Perturb(CoreBlock.xY);
-	ThisBlock.nZ := Perturb(CoreBlock.nZ);
-	ThisBlock.xZ := Perturb(CoreBlock.xZ);
+	ThisBlock.xY := PerturbUp(CoreBlock.xY);
+	ThisBlock.nZ := PerturbSide(CoreBlock.nZ);
+	ThisBlock.xZ := PerturbSide(CoreBlock.xZ);
 	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
 	CullFacing(ThisBlockPolies, Vector(+1, 0, 0));
 	AppendPolies(Result.PolyData, ThisBlockPolies);
 
 	ThisBlock.nX := CoreBlock.xX;
 	ThisBlock.xX := +10;
-	ThisBlock.xY := Perturb(CoreBlock.xY);
-	ThisBlock.nZ := Perturb(CoreBlock.nZ);
-	ThisBlock.xZ := Perturb(CoreBlock.xZ);
+	ThisBlock.xY := PerturbUp(CoreBlock.xY);
+	ThisBlock.nZ := PerturbSide(CoreBlock.nZ);
+	ThisBlock.xZ := PerturbSide(CoreBlock.xZ);
 	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
 	CullFacing(ThisBlockPolies, Vector(-1, 0, 0));
 	AppendPolies(Result.PolyData, ThisBlockPolies);
 
-	ThisBlock.nX := Perturb(CoreBlock.nX);
-	ThisBlock.xX := Perturb(CoreBlock.xX);
-	ThisBlock.xY := Perturb(CoreBlock.xY);
+	ThisBlock.nX := PerturbSide(CoreBlock.nX);
+	ThisBlock.xX := PerturbSide(CoreBlock.xX);
+	ThisBlock.xY := PerturbUp(CoreBlock.xY);
 	ThisBlock.nZ := -10;
 	ThisBlock.xZ := CoreBlock.nZ;
 	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
 	CullFacing(ThisBlockPolies, Vector(0, 0, +1));
 	AppendPolies(Result.PolyData, ThisBlockPolies);
 
-	ThisBlock.nX := Perturb(CoreBlock.nX);
-	ThisBlock.xX := Perturb(CoreBlock.xX);
-	ThisBlock.xY := Perturb(CoreBlock.xY);
+	ThisBlock.nX := PerturbSide(CoreBlock.nX);
+	ThisBlock.xX := PerturbSide(CoreBlock.xX);
+	ThisBlock.xY := PerturbUp(CoreBlock.xY);
 	ThisBlock.nZ := CoreBlock.nZ;
 	ThisBlock.xZ := +10;
 	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
@@ -201,15 +249,20 @@ end;
 function GenericBuilding: TBuildingData;
 var
 	ThisBlock: TBlockData;
+	ThisBlockPolies: TPolies;
 
 begin
+	MakeSidewalk(Result.PolyData);
+
 	ThisBlock.nX := -10;
 	ThisBlock.xX := +10;
 	ThisBlock.xY := Round(34 - RandReal*30);
 	ThisBlock.nZ := -10;
 	ThisBlock.xZ := +10;
-	MakePoliesFromBlock(Result.PolyData, ThisBlock);
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
 end;
+
 procedure OffsetBuilding(var Wot: TBuildingData; Delta: T3Vector);
 var
 	I: Integer;
@@ -231,6 +284,8 @@ var
 
 begin
 	bBegun := False;
+	LastTex := 0;
+	LastStyle := [];
 	for I := 0 to High(Wot.PolyData) do with Wot.PolyData[I] do begin
 		if (not bBegun) or (Tex <> LastTex) or (Style <> LastStyle) then begin
 			if bBegun then glEnd else bBegun := True;
@@ -242,6 +297,39 @@ begin
 				glDisable(GL_LIGHTING)
 			;
 			LastStyle := Style;
+			glBegin(GL_TRIANGLES);
+		end;
+		with N do glNormal3f(X, Y, Z);
+		with A do begin
+			glTexCoord2f(U, V);
+			with Loc do glVertex3f(X, Y, Z);
+		end;
+		with B do begin
+			glTexCoord2f(U, V);
+			with Loc do glVertex3f(X, Y, Z);
+		end;
+		with C do begin
+			glTexCoord2f(U, V);
+			with Loc do glVertex3f(X, Y, Z);
+		end;
+	end;
+	if bBegun then glEnd;
+end;
+
+procedure RenderBuildingWithStyle(const Wot: TBuildingData; TarStyle: TPolyStyles);
+var
+	I: Integer;
+	LastTex: LongWord;
+	bBegun: Boolean;
+
+begin
+	bBegun := False;
+	LastTex := 0;
+	for I := 0 to High(Wot.PolyData) do with Wot.PolyData[I] do if Style = TarStyle then begin
+		if (not bBegun) or (Tex <> LastTex) then begin
+			if bBegun then glEnd else bBegun := True;
+			SetBoundTexture(Tex);
+			LastTex := Tex;
 			glBegin(GL_TRIANGLES);
 		end;
 		with N do glNormal3f(X, Y, Z);

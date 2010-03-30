@@ -22,7 +22,13 @@ var
 implementation
 
 uses
-  Math, MTRandomity, SysUtils, Classes;
+  Math,
+  {$IFDEF Linux}
+    NixRandomity,
+  {$ELSE}
+    MTRandomity,
+  {$ENDIF}
+  SysUtils, Classes;
 
 function Roll(Dice: LongWord = 1; DieSize: Integer = 6): LongWord;
 var
