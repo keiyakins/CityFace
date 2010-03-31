@@ -45,8 +45,14 @@ type
 	end;
 
 	TPlayerData = record
-		Loc: T3Vector;
-		Rot, TarRot: TReal;
+		Loc, Facing: T3Vector;
+		Speed: TReal;
+	end;
+
+	TCameraData = record
+		Loc, Facing: T3Vector;
+		MouseYaw, MousePitch: TReal;
+		FM: array[0..15] of Single;
 	end;
 
 	TActivity = (acNone, acSleep, acShop, acHeal, acMission);
@@ -60,9 +66,11 @@ type
 var
 	Rot: TReal;
 	Player: TPlayerData;
+	Camera: TCameraData;
 	FrameRate, SmoothedFrameRate: TReal;
 	CityBlock: array[-20..20, -20..20] of TCityBlockData;
-
+	MouseSensitivity: TReal;
+	bHasFocus: Boolean = True;
 
 procedure FirstInit;
 begin
@@ -114,6 +122,16 @@ begin
 			ThatImage.GreyPixel[X, Y] := ThisImage.GreyPixel[X, Y] shr 2
 	;
 	AsphaltTex := ThatImage.BakeToL;
+
+	//Green.
+	C := kBlack;
+	for Y := 0 to 255 do
+		for X := 0 to 255 do begin
+			C.G := ThisImage.Pixel[X, Y].G;
+			ThatImage.Pixel[X, Y] := C;
+		end
+	;
+	BushyTex := ThatImage.BakeToL;
 	FreeAndNil(ThatImage);
 
 	//Lighten.
@@ -121,6 +139,8 @@ begin
 		for X := 0 to 255 do
 			ThisImage.GreyPixel[X, Y] := (ThisImage.GreyPixel[X, Y] shr 1) or $80
 	;
+	ConcreteTex := ThisImage.BakeToL;
+
 	//Bevel.
 	for Y := 0 to 255 do
 		for X := 0 to 7 do begin
@@ -141,7 +161,7 @@ begin
 		ThisImage.GreyPixel[I, I] := Round(ThisImage.GreyPixel[I, I]*M + 255*nM);
 		ThisImage.GreyPixel[255-I, 255-I] := Round(ThisImage.GreyPixel[255-I, 255-I]*M);
 	end;
-	ConcreteTex := ThisImage.BakeToL;
+	SidewalkTex := ThisImage.BakeToL;
 
 	ThisImage.Resize(160*3, 160*3, kBlack);
 	//Randomly assign light levels to windows.
@@ -207,6 +227,10 @@ begin
 
 				if PropertyValue > 200 then
 					Building := CubistTumorBuilding()
+				else if PropertyValue > 195 then
+					Building := GenSkyscraperBuilding()
+				else if PropertyValue = 190 then
+					Building := ParkingBuilding()
 				else
 					Building := GenericBuilding()
 				;
@@ -215,10 +239,23 @@ begin
 	;
 end;
 
+function ExtractMousePos: TPoint;
+var
+	X, Y, cX, cY: Integer;
+
+begin
+	cX := Screen.w div 2;
+	cY := Screen.h div 2;
+	SDL_GetMouseState(X, Y);
+	SDL_WarpMouse(cX, cY);
+	Result.X := X - cX;
+	Result.Y := Y - cY;
+end;
+
 procedure InitGame;
 const
-	NearClip = 0.5;
-	FarClip = NearClip * 4000;
+	NearClip = 0.1;
+	FarClip = NearClip * 20000;
 
 var
 	AspectRoot, iAspectRoot: TReal;
@@ -270,7 +307,8 @@ begin
 
 	//Enable lighting.
 	glEnable(GL_LIGHTING);
-	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, InstantArrayPtr(0.0, 0.0, 0.0, 1));
+	//glLightModelfv(GL_LIGHT_MODEL_AMBIENT, InstantArrayPtr(0.0, 0.0, 0.0, 1));
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, InstantArrayPtr(0.05, 0.025, 0.0, 1));
 
 	glEnable(GL_LIGHT0);
 	//glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 1);
@@ -278,8 +316,7 @@ begin
 	//glLightfv(GL_LIGHT0, GL_DIFFUSE, InstantArrayPtr(0.5, 0.5, 0.5, 1));
 	//glLightfv(GL_LIGHT0, GL_SPECULAR, InstantArrayPtr(0.25, 0.25, 0.5, 1));
 
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, InstantArrayPtr(1/3, 1/3, 1/3, 1));
-	glLightfv(GL_LIGHT0, GL_POSITION, InstantArrayPtr(-700, 1300, 1500, 1));
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, InstantArrayPtr(0.3, 0.35, 0.4, 1));
 
 	{
 	//Enable lighting.
@@ -303,6 +340,15 @@ begin
 
 	KeyData := TKeyData.Create;
 	NewBuildings;
+
+	Player.Loc := Vector(0, 0.5, 13);
+	Player.Facing.Z := -1;
+	Camera.Loc := Player.Loc;
+	Camera.Facing := Player.Facing;
+	Player.Speed := 3;
+
+	MouseSensitivity := 8000 / Screen.w;
+	ExtractMousePos;
 end;
 
 procedure CleanupGame;
@@ -316,6 +362,10 @@ var
 
 begin
 	while SDL_PollEvent(@Event) <> 0 do case event.type_ of
+		SDL_ACTIVEEVENT: begin
+			if (event.active.state and SDL_APPINPUTFOCUS) <> 0 then bHasFocus := event.active.gain <> 0;
+			if bHasFocus then ExtractMousePos;
+		end;
 		{
 		SDL_ACTIVEEVENT: if ((event.active.state and SDL_APPINPUTFOCUS) <> 0) and Player.bWantMouselook and (event.active.gain <> Byte(Ord(Player.bMouselook))) then begin
 			SDL_ShowCursor(Ord(Player.bMouselook));
@@ -339,7 +389,7 @@ end;
 
 function DoTime: LongWord;
 var
-  ThisTime: LongWord;
+	ThisTime: LongWord;
 
 begin
 	repeat
@@ -356,9 +406,15 @@ begin
 end;
 
 procedure DoPhysics(dT: LongWord);
+const
+	VNZ: T3Vector = (X: 0; Y: 0; Z: -1);
+
 var
 	fdT: TReal;
 	ES, EC: Extended;
+	J, R, U: T3Vector;
+	I: Integer;
+	dMus: TPoint;
 
 begin
 	fdT := dT * 0.001;
@@ -368,15 +424,69 @@ begin
 
 	Rot := Rot + fdT * 360/45;
 	if Rot >= 360 then Rot := Rot - 360;
+
+	if bHasFocus then begin
+		//Change camera facing based on mouselook.
+		dMus := ExtractMousePos;
+		with Camera do begin
+			MouseYaw := MouseYaw - dMus.X*MouseSensitivity*fdT;
+			MousePitch := Min(80, Max(-80, MousePitch + dMus.Y*MouseSensitivity*fdT));
+			Facing := VYaw(MouseYaw, VPitch(MousePitch, VNZ));
+		end;
+	end;
+	R := VNormal(VCrossProd(Camera.Facing, VY));
+
+	//Change player facing towards camera facing.
+	U := VProd(Camera.Facing, 0.1);
+	for I := 1 to dT do
+		Player.Facing := VSum(VProd(Player.Facing, 0.9), U)
+	;
+	VNormalize(Player.Facing);
+
+	//Player movement.
+	J.X := Ord(KeyData[SDLK_Right] or KeyData[SDLK_KP_Right])
+	     - Ord(KeyData[SDLK_Left] or KeyData[SDLK_KP_Left]);
+	J.Y := Ord(KeyData[SDLK_KP_Plus])
+	     - Ord(KeyData[SDLK_KP_Enter]);
+	J.Z := Ord(KeyData[SDLK_Up] or KeyData[SDLK_KP_Up])
+	     - Ord(KeyData[SDLK_Down] or KeyData[SDLK_KP_Down]);
+	if J.X <> 0 then VADD(Player.Loc, VProd(R, Player.Speed * J.X * fdT));
+	if J.Y <> 0 then VADD(Player.Loc, VProd(VY, Player.Speed * J.Y * fdT));
+	if J.Z <> 0 then VADD(Player.Loc, VProd(Camera.Facing, Player.Speed * J.Z * fdT));
+
+	//Move camera to player.
+	Camera.Loc := Player.Loc;
+
+	//Build OpenGL matrix to represent camera facing.
+	with Camera do begin
+		U := VNormal(VCrossProd(R, Facing));
+		FM[0] := R.X;
+		FM[1] := U.X;
+		FM[2] := -Facing.X;
+		FM[3] := 0;
+		FM[4] := R.Y;
+		FM[5] := U.Y;
+		FM[6] := -Facing.Y;
+		FM[7] := 0;
+		FM[8] := R.Z;
+		FM[9] := U.Z;
+		FM[10] := -Facing.Z;
+		FM[11] := 0;
+		FM[12] := 0;
+		FM[13] := 0;
+		FM[14] := 0;
+		FM[15] := 1;
+	end;
+
+	{
 	Player.Rot := Player.Rot + fdT * 0.3;
 	if Player.Rot >= FullCircle then Player.Rot := Player.Rot - FullCircle;
-	ES := 0;
-	EC := 0;
 	SinCos(Player.Rot, ES, EC);
 	with Player.Loc do begin
 		X := X + ES * fdT;
 		Y := Y - EC * fdT;
 	end;
+	}
 end;
 
 function VAvg(const A, B: T3Vector): T3Vector;
@@ -468,10 +578,6 @@ begin
 end;
 
 procedure DoGraphics;
-const
-	StarPlanes = 4;
-	SPF = 1 / (StarPlanes + 0.5);
-
 var
 	iX, iZ: Integer;
 
@@ -481,9 +587,11 @@ begin
 
 	glColor3f(1, 1, 1);
 	glPushMatrix;
-		glTranslatef(0, 0, -520/2);
-		gldPitch(-24);
-		gldYaw(Rot);
+		glMultMatrixf(@Camera.FM[0]);
+		//Skybox.
+		with Camera.Loc do glTranslatef(-X, -Y, -Z);
+		glLightfv(GL_LIGHT0, GL_POSITION, InstantArrayPtr(-7, 13, 15, 0)); //Directional light.
+
 		glDisable(GL_LIGHTING);
 		for iX := Low(CityBlock) to High(CityBlock) do
 			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
@@ -494,7 +602,7 @@ begin
 			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
 				RenderBuildingWithStyle(CityBlock[iX, iZ].Building, [psLit])
 		;
-		{SetBoundTexture(AsphaltTex);
+		SetBoundTexture(AsphaltTex);
 		//SetBoundTexture(ConcreteTex);
 		glBegin(GL_QUADS);
 			glNormal3f(0, 1, 0);
@@ -506,7 +614,7 @@ begin
 			glVertex3f(533, 0, -533);
 			glTexCoord2f(0, 0);
 			glVertex3f(-533, 0, -533);
-		glEnd;}
+		glEnd;
 	glPopMatrix;
 
 	glDisable(GL_LIGHTING);
@@ -530,4 +638,5 @@ begin
 
 	SDL_GL_SwapBuffers();
 end;
+
 end.

@@ -26,6 +26,18 @@ type
 		property BuckyState: TBuckyState read GetBuckyState;
 	end;
 
+const
+	SDLK_KP_Up = SDLK_KP8;
+	SDLK_KP_Down = SDLK_KP2;
+	SDLK_KP_Left = SDLK_KP4;
+	SDLK_KP_Right = SDLK_KP6;
+	SDLK_KP_Home = SDLK_KP7;
+	SDLK_KP_End = SDLK_KP1;
+	SDLK_KP_PgUp = SDLK_KP9;
+	SDLK_KP_PgDn = SDLK_KP3;
+
+
+
 implementation
 
 uses

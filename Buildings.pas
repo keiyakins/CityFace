@@ -28,15 +28,14 @@ type
 
 function CubistTumorBuilding: TBuildingData;
 function GenericBuilding: TBuildingData;
+function GenSkyscraperBuilding: TBuildingData;
+function ParkingBuilding: TBuildingData;
 procedure OffsetBuilding(var Wot: TBuildingData; Delta: T3Vector);
 procedure RenderBuilding(const Wot: TBuildingData);
 procedure RenderBuildingWithStyle(const Wot: TBuildingData; TarStyle: TPolyStyles);
 
 var
-	WindowedTex: LongWord = 0;
-	RoofTex: LongWord = 0;
-	ConcreteTex: LongWord = 0;
-	AsphaltTex: LongWord = 0;
+	WindowedTex, RoofTex, ConcreteTex, SidewalkTex, AsphaltTex, BushyTex: LongWord;
 
 
 
@@ -68,7 +67,7 @@ begin
 	VarList[2].Value := V.Z;
 end;
 
-procedure SetUVVars(U, V: Double);
+procedure SetUVVars(U, V: TReal);
 begin
 	SetLength(VarList, 2);
 	VarList[0].Nom := 'U';
@@ -120,7 +119,7 @@ begin
 	end;
 end;
 
-procedure MakePoliesFromBlock(var Polies: TPolies; Block: TBlockData);
+procedure MakePoliesFromBlock(var Polies: TPolies; Block: TBlockData; bTop: Boolean = True; bBottom: Boolean = False);
 begin
 	with Block do begin
 		SetLength(Polies, 10);
@@ -132,21 +131,28 @@ begin
 	end;
 end;
 
-procedure MakeSidewalk(var Polies: TPolies);
+procedure CullFacing(var Polies: TPolies; FacingN: T3Vector);
 var
-	CoreBlock: TBlockData;
+	H, I: Integer;
+
+begin
+	H := High(Polies);
+	for I := H downto 0 do with Polies[I] do
+		if VDotProd(N, FacingN) > 0.9 then begin
+			if I < H then Polies[I] := Polies[H];
+			SetLength(Polies, H);
+			Dec(H);
+		end
+	;
+end;
+
+procedure ConvertPoliesToSmallTex(var Polies: TPolies; SmallTex: LongWord);
+var
 	I: Integer;
 
 begin
-	CoreBlock.nX := -11;
-	CoreBlock.xX := +11;
-	CoreBlock.nY := 0;
-	CoreBlock.xY := +0.05;
-	CoreBlock.nZ := -11;
-	CoreBlock.xZ := +11;
-	MakePoliesFromBlock(Polies, CoreBlock);
 	for I := 0 to High(Polies) do begin
-		Polies[I].Tex := ConcreteTex;
+		Polies[I].Tex := SmallTex;
 		Polies[I].Style := [psLit];
 		with Polies[I].A do begin
 			U := U*20;
@@ -163,6 +169,21 @@ begin
 	end;
 end;
 
+procedure MakeSidewalk(var Polies: TPolies);
+var
+	CoreBlock: TBlockData;
+
+begin
+	CoreBlock.nX := -11;
+	CoreBlock.xX := +11;
+	CoreBlock.nY := 0;
+	CoreBlock.xY := +0.05;
+	CoreBlock.nZ := -11;
+	CoreBlock.xZ := +11;
+	MakePoliesFromBlock(Polies, CoreBlock);
+	ConvertPoliesToSmallTex(Polies, SidewalkTex);
+end;
+
 function CubistTumorBuilding: TBuildingData;
 
 	function PerturbUp(N: TReal): TReal;
@@ -175,21 +196,6 @@ function CubistTumorBuilding: TBuildingData;
 		Result := Round((RandReal + 1)/3 * N);
 	end;
 
-	procedure CullFacing(var Polies: TPolies; FacingN: T3Vector);
-	var
-		H, I: Integer;
-
-	begin
-		H := High(Polies);
-		for I := H downto 0 do with Polies[I] do
-			if VDotProd(N, FacingN) > 0.9 then begin
-				if I < H then Polies[I] := Polies[H];
-				SetLength(Polies, H);
-				Dec(H);
-			end
-		;
-	end;
-
 var
 	CoreBlock, ThisBlock: TBlockData;
 	ThisBlockPolies: TPolies;
@@ -200,7 +206,7 @@ begin
 	CoreBlock.nX := -9 + Integer(RandN(7));
 	CoreBlock.xX := +9 - Integer(RandN(7));
 	CoreBlock.nY := 0;
-	CoreBlock.xY := +64 - Integer(RandN(7));
+	CoreBlock.xY := +64 - Integer(RandN(16));
 	CoreBlock.nZ := -9 + Integer(RandN(7));
 	CoreBlock.xZ := +9 - Integer(RandN(7));
 	MakePoliesFromBlock(ThisBlockPolies, CoreBlock);
@@ -237,7 +243,7 @@ begin
 	ThisBlock.nX := PerturbSide(CoreBlock.nX);
 	ThisBlock.xX := PerturbSide(CoreBlock.xX);
 	ThisBlock.xY := PerturbUp(CoreBlock.xY);
-	ThisBlock.nZ := CoreBlock.nZ;
+	ThisBlock.nZ := CoreBlock.xZ;
 	ThisBlock.xZ := +10;
 	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
 	CullFacing(ThisBlockPolies, Vector(0, 0, -1));
@@ -256,12 +262,67 @@ begin
 
 	ThisBlock.nX := -10;
 	ThisBlock.xX := +10;
-	ThisBlock.xY := Round(34 - RandReal*30);
+	ThisBlock.nY := 0;
+	ThisBlock.xY := 24 - RandN(20);
 	ThisBlock.nZ := -10;
 	ThisBlock.xZ := +10;
 	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
 	AppendPolies(Result.PolyData, ThisBlockPolies);
 end;
+
+function GenSkyscraperBuilding: TBuildingData;
+var
+	ThisBlock: TBlockData;
+	ThisBlockPolies: TPolies;
+
+begin
+	MakeSidewalk(Result.PolyData);
+
+	ThisBlock.nX := -10;
+	ThisBlock.xX := +10;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := 48 - RandN(16);
+	ThisBlock.nZ := -10;
+	ThisBlock.xZ := +10;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+end;
+
+function ParkingBuilding: TBuildingData;
+var
+	ThisBlock: TBlockData;
+	ThisBlockPolies: TPolies;
+	I, Floors: Integer;
+
+begin
+	MakeSidewalk(Result.PolyData);
+
+	Floors := 24 - RandN(20);
+
+	ThisBlock.nX := -9.5;
+	ThisBlock.xX := -8.5;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := Floors;
+	ThisBlock.nZ := -9.5;
+	ThisBlock.xZ := -8.5;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, ConcreteTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
+	for I := 0 to Floors - 1 do begin
+		ThisBlock.nX := -10;
+		ThisBlock.xX := +10;
+		ThisBlock.nY := I;
+		ThisBlock.xY := I + 0.1;
+		ThisBlock.nZ := -10;
+		ThisBlock.xZ := +10;
+		MakePoliesFromBlock(ThisBlockPolies, ThisBlock, True, I > 0);
+		ConvertPoliesToSmallTex(ThisBlockPolies, ConcreteTex);
+		AppendPolies(Result.PolyData, ThisBlockPolies);
+	end;
+end;
+
+
 
 procedure OffsetBuilding(var Wot: TBuildingData; Delta: T3Vector);
 var
