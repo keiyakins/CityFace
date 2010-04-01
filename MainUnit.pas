@@ -354,6 +354,12 @@ end;
 procedure CleanupGame;
 begin
 	FreeAndNil(KeyData);
+	glDeleteTextures(1, @WindowedTex);
+	glDeleteTextures(1, @RoofTex);
+	glDeleteTextures(1, @ConcreteTex);
+	glDeleteTextures(1, @SidewalkTex);
+	glDeleteTextures(1, @AsphaltTex);
+	glDeleteTextures(1, @BushyTex);
 end;
 
 procedure DoEvents;
@@ -577,10 +583,30 @@ begin
 	end;
 end;
 
-procedure DoGraphics;
+procedure RenderNeighborhoodWithStyle(Style: TPolyStyles);
 var
 	iX, iZ: Integer;
 
+begin
+	for iX := 0 to High(CityBlock) do
+		for iZ := 0 to High(CityBlock[iX]) do
+			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
+	;
+	for iX := -1 downto Low(CityBlock) do
+		for iZ := 0 to High(CityBlock[iX]) do
+			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
+	;
+	for iX := 0 to High(CityBlock) do
+		for iZ := -1 downto Low(CityBlock[iX]) do
+			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
+	;
+	for iX := -1 downto Low(CityBlock) do
+		for iZ := -1 downto Low(CityBlock[iX]) do
+			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
+	;
+end;
+
+procedure DoGraphics;
 begin
 	glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
@@ -588,20 +614,16 @@ begin
 	glColor3f(1, 1, 1);
 	glPushMatrix;
 		glMultMatrixf(@Camera.FM[0]);
-		//Skybox.
+		//`@ Skybox...
 		with Camera.Loc do glTranslatef(-X, -Y, -Z);
 		glLightfv(GL_LIGHT0, GL_POSITION, InstantArrayPtr(-7, 13, 15, 0)); //Directional light.
 
+		//`@ Eventually, we should split the polies by texture and style.
+		//`@ And then sort the closest to the camera first.
 		glDisable(GL_LIGHTING);
-		for iX := Low(CityBlock) to High(CityBlock) do
-			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
-				RenderBuildingWithStyle(CityBlock[iX, iZ].Building, [])
-		;
+		RenderNeighborhoodWithStyle([]);
 		glEnable(GL_LIGHTING);
-		for iX := Low(CityBlock) to High(CityBlock) do
-			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
-				RenderBuildingWithStyle(CityBlock[iX, iZ].Building, [psLit])
-		;
+		RenderNeighborhoodWithStyle([psLit]);
 		SetBoundTexture(AsphaltTex);
 		//SetBoundTexture(ConcreteTex);
 		glBegin(GL_QUADS);

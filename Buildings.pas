@@ -292,28 +292,32 @@ function ParkingBuilding: TBuildingData;
 var
 	ThisBlock: TBlockData;
 	ThisBlockPolies: TPolies;
-	I, Floors: Integer;
+	I, S, Floors: Integer;
 
 begin
 	MakeSidewalk(Result.PolyData);
 
-	Floors := 24 - RandN(20);
+	Floors := 16 - RandN(14);
 
-	ThisBlock.nX := -9.5;
-	ThisBlock.xX := -8.5;
-	ThisBlock.nY := 0;
-	ThisBlock.xY := Floors;
-	ThisBlock.nZ := -9.5;
-	ThisBlock.xZ := -8.5;
-	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
-	ConvertPoliesToSmallTex(ThisBlockPolies, ConcreteTex);
-	AppendPolies(Result.PolyData, ThisBlockPolies);
+	for I := 0 to 3 do begin
+		S := ((I and 1) * 2 - 1) * 9;
+		ThisBlock.nX := S - 0.5;
+		ThisBlock.xX := S + 0.5;
+		ThisBlock.nY := 0;
+		ThisBlock.xY := Floors*1.5;
+		S := ((I and 2) - 1) * 9;
+		ThisBlock.nZ := S - 0.5;
+		ThisBlock.xZ := S + 0.5;
+		MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+		ConvertPoliesToSmallTex(ThisBlockPolies, ConcreteTex);
+		AppendPolies(Result.PolyData, ThisBlockPolies);
+	end;
 
 	for I := 0 to Floors - 1 do begin
 		ThisBlock.nX := -10;
 		ThisBlock.xX := +10;
-		ThisBlock.nY := I;
-		ThisBlock.xY := I + 0.1;
+		ThisBlock.nY := I*1.5;
+		ThisBlock.xY := I*1.5 + 0.5;
 		ThisBlock.nZ := -10;
 		ThisBlock.xZ := +10;
 		MakePoliesFromBlock(ThisBlockPolies, ThisBlock, True, I > 0);
