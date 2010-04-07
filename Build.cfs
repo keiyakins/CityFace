@@ -1,0 +1,85 @@
+FactionType PlayerSIN:
+end FactionType
+
+FactionType = Yakuza:
+end FactionType
+
+FactionType = Triad:
+end FactionType
+
+FactionType = Police:
+end FactionType
+
+Faction = PlayerSIN0:
+	Type = PlayerSIN
+end Faction
+
+Faction = PlayerSIN1:
+	Type = PlayerSIN
+end Faction
+
+Faction = PlayerSIN2:
+	Type = PlayerSIN
+end Faction
+
+Faction = PlayerSIN3:
+	Type = PlayerSIN
+end Faction
+
+Faction = LoneStarr:
+	Type = Police
+end Faction
+
+NeighborhoodType = Downtown:
+	BlockMergeStart = .1
+	BlockMergeSustain = 2/3
+	BasePropertyValue = 192
+	PropertyCenterBoost = +1
+	BuildingType = GOffice:
+		Func = GenericBuilding
+		Common = 100
+	BuildingType = GSOffice:
+		Func = GenSkyscraperBuilding
+		Common = 30
+	BuildingType = CTOffice:
+		Func = CubistTumorBuilding
+		Common = 10
+	BuildingType = UpscaleHotel:
+		Func = CubistTumorBuilding
+		Common = 1
+		Activity = Sleep
+		PriceFactor = 4
+		SINLessOK = False
+	BuildingType = MidHotel:
+		Func = GenSkyscraperBuilding
+		Common = 1
+		Activity = Sleep
+		PriceFactor = 1
+	BuildingType = CoffinHotel:
+		Func = GenericBuilding
+		Common = 1
+		Activity = Sleep
+		PriceFactor = .25
+		SINLessOK = True
+	BuildingType = ArtilleryBarn:
+		Func = GenericBuilding
+		Common = 1
+		Activity = Shop(Weapon)
+		PriceFactor = 1
+	BuildingType = YakOffice:
+		Func = CubistTumorBuilding
+		Common = 1
+		FactionBase = Yakuza
+	BuildingType = TriadOffice:
+		Func = GenSkyscraperBuilding
+		Common = 1
+		FactionBase = Triad
+	BuildingType = LoneStarrOffice:
+		Func = GenericBuilding
+		Common = 1
+		FactionLink = LoneStarr
+	BuildingType = Hospital:
+		Func = GenericBuilding
+		Common = 1
+		Activity = Heal
+end NeighborhoodType

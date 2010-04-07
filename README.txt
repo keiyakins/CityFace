@@ -1,3 +1,3 @@
 CityFace
 Procgenned GTA clone (eventually)
-Requires dlib
+Requires dlib <http://darekun.dnsdojo.net/CityFace/DLib.zip>

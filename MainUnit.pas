@@ -37,7 +37,7 @@ uses
 	GL, GLD, GLImages,
 	DUtils, D3Vectors,
 	SpaceTextures,
-	Buildings;
+	Buildings, BuildScripts;
 
 type
 	TFColor = record
@@ -54,8 +54,6 @@ type
 		MouseYaw, MousePitch: TReal;
 		FM: array[0..15] of Single;
 	end;
-
-	TActivity = (acNone, acSleep, acShop, acHeal, acMission);
 
 	TCityBlockData = record
 		PropertyValue: Byte;
@@ -417,7 +415,6 @@ const
 
 var
 	fdT: TReal;
-	ES, EC: Extended;
 	J, R, U: T3Vector;
 	I: Integer;
 	dMus: TPoint;
@@ -483,16 +480,6 @@ begin
 		FM[14] := 0;
 		FM[15] := 1;
 	end;
-
-	{
-	Player.Rot := Player.Rot + fdT * 0.3;
-	if Player.Rot >= FullCircle then Player.Rot := Player.Rot - FullCircle;
-	SinCos(Player.Rot, ES, EC);
-	with Player.Loc do begin
-		X := X + ES * fdT;
-		Y := Y - EC * fdT;
-	end;
-	}
 end;
 
 function VAvg(const A, B: T3Vector): T3Vector;
@@ -585,25 +572,27 @@ end;
 
 procedure RenderNeighborhoodWithStyle(Style: TPolyStyles);
 var
-	iX, iZ: Integer;
+	iD, iX, iZ: Integer;
 
 begin
-	for iX := 0 to High(CityBlock) do
-		for iZ := 0 to High(CityBlock[iX]) do
-			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
-	;
-	for iX := -1 downto Low(CityBlock) do
-		for iZ := 0 to High(CityBlock[iX]) do
-			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
-	;
-	for iX := 0 to High(CityBlock) do
-		for iZ := -1 downto Low(CityBlock[iX]) do
-			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
-	;
-	for iX := -1 downto Low(CityBlock) do
-		for iZ := -1 downto Low(CityBlock[iX]) do
-			RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
-	;
+	{//The naive implementation, in case the optimization becomes a problem.
+		for iX := Low(CityBlock) to High(CityBlock) do
+			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
+				RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
+		;
+	}
+
+	RenderBuildingWithStyle(CityBlock[0, 0].Building, Style);
+	for iD := 1 to 20 do begin
+		for iX := -iD to +iD do begin
+			RenderBuildingWithStyle(CityBlock[iX, -iD].Building, Style);
+			RenderBuildingWithStyle(CityBlock[iX, +iD].Building, Style);
+		end;
+		for iZ := -iD+1 to +iD-1 do begin
+			RenderBuildingWithStyle(CityBlock[-iD, iZ].Building, Style);
+			RenderBuildingWithStyle(CityBlock[+iD, iZ].Building, Style);
+		end;
+	end;
 end;
 
 procedure DoGraphics;
@@ -615,6 +604,8 @@ begin
 	glPushMatrix;
 		glMultMatrixf(@Camera.FM[0]);
 		//`@ Skybox...
+		//glDisable(GL_DEPTH_TEST);
+		//glEnable(GL_DEPTH_TEST);
 		with Camera.Loc do glTranslatef(-X, -Y, -Z);
 		glLightfv(GL_LIGHT0, GL_POSITION, InstantArrayPtr(-7, 13, 15, 0)); //Directional light.
 
