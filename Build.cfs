@@ -82,4 +82,7 @@ NeighborhoodType = Downtown:
 		Func = GenericBuilding
 		Common = 1
 		Activity = Heal
+	BuildingType = SmallPark:
+		Func = SmallParkBuilding
+		Common = 1
 end NeighborhoodType

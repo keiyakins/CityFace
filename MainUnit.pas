@@ -227,6 +227,8 @@ begin
 					Building := CubistTumorBuilding()
 				else if PropertyValue > 195 then
 					Building := GenSkyscraperBuilding()
+				else if PropertyValue = 191 then
+					Building := SmallParkBuilding()
 				else if PropertyValue = 190 then
 					Building := ParkingBuilding()
 				else

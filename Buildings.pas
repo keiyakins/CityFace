@@ -30,6 +30,7 @@ function CubistTumorBuilding: TBuildingData;
 function GenericBuilding: TBuildingData;
 function GenSkyscraperBuilding: TBuildingData;
 function ParkingBuilding: TBuildingData;
+function SmallParkBuilding: TBuildingData;
 procedure OffsetBuilding(var Wot: TBuildingData; Delta: T3Vector);
 procedure RenderBuilding(const Wot: TBuildingData);
 procedure RenderBuildingWithStyle(const Wot: TBuildingData; TarStyle: TPolyStyles);
@@ -326,7 +327,82 @@ begin
 	end;
 end;
 
+function SmallParkBuilding: TBuildingData;
+var
+	ThisBlock: TBlockData;
+	ThisBlockPolies: TPolies;
 
+begin
+	ThisBlock.nX := -11;
+	ThisBlock.xX := -10;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := +0.05;
+	ThisBlock.nZ := -11;
+	ThisBlock.xZ := +11;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, SidewalkTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
+	ThisBlock.nX := +10;
+	ThisBlock.xX := +11;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := +0.05;
+	ThisBlock.nZ := -11;
+	ThisBlock.xZ := +11;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, SidewalkTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
+	ThisBlock.nX := -10;
+	ThisBlock.xX := +10;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := +0.05;
+	ThisBlock.nZ := -11;
+	ThisBlock.xZ := -10;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, SidewalkTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
+	ThisBlock.nX := -10;
+	ThisBlock.xX := +10;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := +0.05;
+	ThisBlock.nZ := +10;
+	ThisBlock.xZ := +11;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, SidewalkTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
+	ThisBlock.nX := -10;
+	ThisBlock.xX := +10;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := +0.05;
+	ThisBlock.nZ := -10;
+	ThisBlock.xZ := +10;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, BushyTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
+	ThisBlock.nX := -0.5;
+	ThisBlock.xX := +0.5;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := +0.25;
+	ThisBlock.nZ := -0.5;
+	ThisBlock.xZ := +0.5;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, SidewalkTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+
+	ThisBlock.nX := -0.25;
+	ThisBlock.xX := +0.25;
+	ThisBlock.nY := 0;
+	ThisBlock.xY := +2;
+	ThisBlock.nZ := -0.25;
+	ThisBlock.xZ := +0.25;
+	MakePoliesFromBlock(ThisBlockPolies, ThisBlock);
+	ConvertPoliesToSmallTex(ThisBlockPolies, SidewalkTex);
+	AppendPolies(Result.PolyData, ThisBlockPolies);
+end;
 
 procedure OffsetBuilding(var Wot: TBuildingData; Delta: T3Vector);
 var
