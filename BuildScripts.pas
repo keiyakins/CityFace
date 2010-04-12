@@ -3,7 +3,7 @@ unit BuildScripts;
 interface
 
 uses
-	DUtils, Buildings, Solvation;
+	DUtils, D3Vectors, Buildings, Solvation;
 
 type
 	TActivity = (acNone, acSleep, acShop, acHeal, acMission);
@@ -14,6 +14,7 @@ type
 
 	TFactionType = class
 		Nom: String;
+		AutoIndex: Integer;
 	end;
 
 	TFaction = class
@@ -43,15 +44,29 @@ type
 		TotCommon: Integer;
 	end;
 
+	TCityBlockData = record
+		PropertyValue: Byte;
+		BuildingType: TBuildingType;
+		LinkedFaction: TFaction;
+		Building: TBuildingData;
+	end;
+
 	TNeighborhood = class
 		Nom: String;
 		NeighborhoodType: TNeighborhoodType;
+		CityBlock: array[-20..20, -20..20] of TCityBlockData;
 	end;
 
 var
 	FactionType: array of TFactionType;
 	Faction: array of TFaction;
 	NeighborhoodType: array of TNeighborhoodType;
+	Neighborhood: array of TNeighborhood;
+
+
+
+procedure LoadBuildScript;
+function BuildNeighborhoodFromType(NT: TNeighborhoodType): TNeighborhood;
 
 
 
@@ -60,7 +75,7 @@ var
 implementation
 
 uses
-	Randomity, SysUtils;
+	Math, Randomity, SysUtils;
 
 var
 	BuildLog: String;
@@ -489,6 +504,63 @@ begin
 			Log('Build script warning: unrecognized directive "' + LValue + '".');
 		end;
 	end;
+
+	DumpStringToFile(BuildLog, 'BuildLoad.log');
+	BuildLog := '';
+end;
+
+function BuildNeighborhoodFromType(NT: TNeighborhoodType): TNeighborhood;
+const
+	ValuePivot = 10; //Half the max coordinate in a single direction.
+
+var
+	I, C, D, iX, iZ: Integer;
+
+begin
+	Result := TNeighborhood.Create;
+	Result.NeighborhoodType := NT;
+	for iX := Low(Result.CityBlock) to High(Result.CityBlock) do
+		for iZ := Low(Result.CityBlock[iX]) to High(Result.CityBlock[iX]) do with Result.CityBlock[iX, iZ] do begin
+			D := Max(Abs(iX), Abs(iZ)); //Manhattan distance from center.
+			PropertyValue := Round(
+				NT.BasePropertyValue + NT.PropertyCenterBoost*(ValuePivot - D)
+			);
+
+			BuildingType := nil; //Needs a for/else; use of a sentinel is a hack.
+			C := RandN(NT.TotCommon);
+			for I := 0 to High(NT.BuildingType) do begin
+				Dec(C, NT.BuildingType[I].Common);
+				if C < 0 then begin
+					BuildingType := NT.BuildingType[I];
+					Break;
+				end;
+			end;
+			if BuildingType = nil then begin
+				Log('Build warning: dropped off end of Building Type array in Neighborhood Type "' + NT.Nom + '". TotCommon > sum of Common? Picking one at random.');
+				BuildingType := NT.BuildingType[RandN(Length(NT.BuildingType))];
+			end;
+
+			Building := BuildingType.BuildFunc(); //`@ Will need params, see TBuildFunc.
+			OffsetBuilding(Building, Vector(26*iX, 0, 26*iZ));
+
+			LinkedFaction := BuildingType.FactionLink;
+			if BuildingType.FactionBase <> nil then begin
+				LinkedFaction := TFaction.Create;
+				with LinkedFaction do begin
+					FactionType := BuildingType.FactionBase;
+					Inc(FactionType.AutoIndex);
+					Nom := FactionType.Nom + ' ' + IntToStr(FactionType.AutoIndex);
+					//Log('Build debug: created faction "' + Nom + '".');
+				end;
+				I := Length(Faction);
+				SetLength(Faction, I + 1);
+				Faction[I] := LinkedFaction;
+			end;
+		end
+	;
+
+	DumpStringToFile(BuildLog, 'BuildEx.log');
+	BuildLog := '';
 end;
 
 end.

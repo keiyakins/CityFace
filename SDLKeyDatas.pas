@@ -13,17 +13,24 @@ type
 	TKeyData = class
 	protected
 		FKeyDown: array[0..511] of Boolean;
+		FKeyPress: array[0..511] of Boolean;
 		FOnKeyDown: array[0..511] of TSDLKeyEvent;
 
-		function GetKeyDown(Index: Integer): Boolean;
-		procedure SetKeyDown(Index: Integer; const Value: Boolean);
-		function GetOnKeyDown(Index: Integer): TSDLKeyEvent;
-		procedure SetOnKeyDown(Index: Integer; const Value: TSDLKeyEvent);
-		function GetBuckyState: TBuckyState;
+		function GetKeyDown(Index: Integer): Boolean; virtual;
+		procedure SetKeyDown(Index: Integer; const Value: Boolean); virtual;
+		function GetKeyPress(Index: Integer): Boolean; virtual;
+		procedure SetKeyPress(Index: Integer; const Value: Boolean); virtual;
+		function GetOnKeyDown(Index: Integer): TSDLKeyEvent; virtual;
+		procedure SetOnKeyDown(Index: Integer; const Value: TSDLKeyEvent); virtual;
+		function GetBuckyState: TBuckyState; virtual;
+		function GetKeyDownPress(Index: Integer): Boolean; virtual;
 	public
-		property KeyDown[Index: Integer]: Boolean read GetKeyDown write SetKeyDown; default;
+		property KeyDown[Index: Integer]: Boolean read GetKeyDown write SetKeyDown;
+		property KeyDownPress[Index: Integer]: Boolean read GetKeyDownPress; default;
+		property KeyPress[Index: Integer]: Boolean read GetKeyPress write SetKeyPress;
 		property OnKeyDown[Index: Integer]: TSDLKeyEvent read GetOnKeyDown write SetOnKeyDown;
 		property BuckyState: TBuckyState read GetBuckyState;
+		procedure ClearPress; virtual;
 	end;
 
 const
@@ -45,6 +52,14 @@ uses
 
 { TKeyData }
 
+procedure TKeyData.ClearPress;
+var
+	I: Integer;
+
+begin
+	for I := 0 to High(FKeyPress) do FKeyPress[I] := False;
+end;
+
 function TKeyData.GetBuckyState: TBuckyState;
 begin
 	Result := [];
@@ -60,6 +75,20 @@ begin
 	Result := FKeyDown[Index];
 end;
 
+function TKeyData.GetKeyDownPress(Index: Integer): Boolean;
+begin
+	if Index < 0 then raise EListError.Create('Key index ' + IntToStr(Index) + ' is impossibly low.');
+	if Index > High(FKeyPress) then raise EListError.Create('Key index ' + IntToStr(Index) + ' is too high.');
+	Result := FKeyDown[Index] or FKeyPress[Index];
+end;
+
+function TKeyData.GetKeyPress(Index: Integer): Boolean;
+begin
+	if Index < 0 then raise EListError.Create('Key index ' + IntToStr(Index) + ' is impossibly low.');
+	if Index > High(FKeyPress) then raise EListError.Create('Key index ' + IntToStr(Index) + ' is too high.');
+	Result := FKeyPress[Index];
+end;
+
 function TKeyData.GetOnKeyDown(Index: Integer): TSDLKeyEvent;
 begin
 	if Index < 0 then raise EListError.Create('Key index ' + IntToStr(Index) + ' is impossibly low.');
@@ -72,6 +101,18 @@ begin
 	if Index < 0 then raise EListError.Create('Key index ' + IntToStr(Index) + ' is impossibly low.');
 	if Index > High(FKeyDown) then raise EListError.Create('Key index ' + IntToStr(Index) + ' is too high.');
 	FKeyDown[Index] := Value;
+	if Value then begin
+		FKeyPress[Index] := True;
+
+		if Assigned(FOnKeyDown[Index]) then FOnKeyDown[Index](Index);
+	end;
+end;
+
+procedure TKeyData.SetKeyPress(Index: Integer; const Value: Boolean);
+begin
+	if Index < 0 then raise EListError.Create('Key index ' + IntToStr(Index) + ' is impossibly low.');
+	if Index > High(FKeyPress) then raise EListError.Create('Key index ' + IntToStr(Index) + ' is too high.');
+	FKeyPress[Index] := Value;
 
 	if Value and Assigned(FOnKeyDown[Index]) then FOnKeyDown[Index](Index);
 end;

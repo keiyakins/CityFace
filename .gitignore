@@ -1,5 +1,6 @@
 *.o
 *.ppu
+*.log
 *.exe
 *.dll
 *.ccf
