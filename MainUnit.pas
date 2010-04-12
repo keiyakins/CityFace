@@ -29,11 +29,7 @@ implementation
 
 uses
 	SysUtils, Math,
-	{$IFDEF Linux}
-		NixRandomity,
-	{$ELSE}
-		MTRandomity,
-	{$ENDIF}
+	Randomity,
 	GL, GLD, GLImages,
 	DUtils, D3Vectors,
 	SpaceTextures,

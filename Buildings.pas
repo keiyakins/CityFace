@@ -43,11 +43,7 @@ var
 implementation
 
 uses
-	{$IFDEF Linux}
-		NixRandomity,
-	{$ELSE}
-		MTRandomity,
-	{$ENDIF}
+	Randomity,
 	GL, GLD,
 	Solvation;
 

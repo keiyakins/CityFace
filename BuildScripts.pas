@@ -60,12 +60,7 @@ var
 implementation
 
 uses
-	{$IFDEF Linux}
-		NixRandomity,
-	{$ELSE}
-		MTRandomity,
-	{$ENDIF}
-	SysUtils;
+	Randomity, SysUtils;
 
 var
 	BuildLog: String;
