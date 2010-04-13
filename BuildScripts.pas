@@ -329,6 +329,8 @@ begin
 					Result.BuildFunc := GenericBuilding
 				else if UpperCase(RValue) = 'PARKINGBUILDING' then
 					Result.BuildFunc := ParkingBuilding
+				else if UpperCase(RValue) = 'SMALLPARKBUILDING' then
+					Result.BuildFunc := SmallParkBuilding
 				else
 					Log('Build script warning: invalid Func "' + RValue + '" in BuildingType ' + Result.Nom + '.')
 				;

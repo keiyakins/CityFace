@@ -84,5 +84,5 @@ NeighborhoodType = Downtown:
 		Activity = Heal
 	BuildingType = SmallPark:
 		Func = SmallParkBuilding
-		Common = 1
+		Common = 10
 end NeighborhoodType
