@@ -5,58 +5,6 @@ interface
 uses
 	DUtils, D3Vectors, Buildings, Solvation;
 
-type
-	TActivity = (acNone, acSleep, acShop, acHeal, acMission);
-
-	TBuildFunc = function: TBuildingData; //`@ Will probably need to be passed a ref to the block, which will include property value, effectively shape data, etc.
-	TGearType = (gtWeapon, gtVehicle);
-	TGearTypes = set of TGearType;
-
-	TFactionType = class
-		Nom: String;
-		AutoIndex: Integer;
-	end;
-
-	TFaction = class
-		Nom: String;
-		FactionType: TFactionType;
-	end;
-
-	TBuildingType = class
-		Nom: String;
-		BuildFunc: TBuildFunc;
-		Common: Integer;
-		Activity: TActivity;
-		ShopGear: TGearTypes;
-		PriceFactor: TReal;
-		bSINlessOK: Boolean;
-		FactionBase: TFactionType;
-		FactionLink: TFaction;
-	end;
-
-	TNeighborhoodType = class
-		Nom: String;
-		BlockMergeStart: TReal;
-		BlockMergeSustain: TReal;
-		BasePropertyValue: TReal;
-		PropertyCenterBoost: TReal;
-		BuildingType: array of TBuildingType;
-		TotCommon: Integer;
-	end;
-
-	TCityBlockData = record
-		PropertyValue: Byte;
-		BuildingType: TBuildingType;
-		LinkedFaction: TFaction;
-		Building: TBuildingData;
-	end;
-
-	TNeighborhood = class
-		Nom: String;
-		NeighborhoodType: TNeighborhoodType;
-		CityBlock: array[-20..20, -20..20] of TCityBlockData;
-	end;
-
 var
 	FactionType: array of TFactionType;
 	Faction: array of TFaction;
@@ -543,9 +491,6 @@ begin
 				BuildingType := NT.BuildingType[RandN(Length(NT.BuildingType))];
 			end;
 
-			Building := BuildingType.BuildFunc(); //`@ Will need params, see TBuildFunc.
-			OffsetBuilding(Building, Vector(26*iX, 0, 26*iZ));
-
 			LinkedFaction := BuildingType.FactionLink;
 			if BuildingType.FactionBase <> nil then begin
 				LinkedFaction := TFaction.Create;
@@ -559,6 +504,9 @@ begin
 				SetLength(Faction, I + 1);
 				Faction[I] := LinkedFaction;
 			end;
+
+			Building := BuildingType.BuildFunc(Result.CityBlock[iX, iZ]);
+			OffsetBuilding(Building, Vector(26*iX, 0, 26*iZ));
 		end
 	;
 

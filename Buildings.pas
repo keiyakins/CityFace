@@ -6,6 +6,9 @@ uses
 	D3Vectors, DUtils;
 
 type
+	TBuildingType = class;
+	TFaction = class;
+
 	TPolyStyle = (psLit, psSpecular);
 	TPolyStyles = set of TPolyStyle;
 
@@ -26,11 +29,64 @@ type
 		PolyData: TPolies;
 	end;
 
-function CubistTumorBuilding: TBuildingData;
-function GenericBuilding: TBuildingData;
-function GenSkyscraperBuilding: TBuildingData;
-function ParkingBuilding: TBuildingData;
-function SmallParkBuilding: TBuildingData;
+	PCityBlockData = ^TCityBlockData;
+	TCityBlockData = record
+		PropertyValue: Byte;
+		BuildingType: TBuildingType;
+		LinkedFaction: TFaction;
+		Building: TBuildingData;
+	end;
+
+	TActivity = (acNone, acSleep, acShop, acHeal, acMission);
+
+	TBuildFunc = function(const CityBlock: TCityBlockData): TBuildingData;
+	TGearType = (gtWeapon, gtVehicle);
+	TGearTypes = set of TGearType;
+
+	TFactionType = class
+		Nom: String;
+		AutoIndex: Integer;
+	end;
+
+	TFaction = class
+		Nom: String;
+		FactionType: TFactionType;
+	end;
+
+	TBuildingType = class
+		Nom: String;
+		BuildFunc: TBuildFunc;
+		Common: Integer;
+		Activity: TActivity;
+		ShopGear: TGearTypes;
+		PriceFactor: TReal;
+		bSINlessOK: Boolean;
+		FactionBase: TFactionType;
+		FactionLink: TFaction;
+	end;
+
+	TNeighborhoodType = class
+		Nom: String;
+		BlockMergeStart: TReal;
+		BlockMergeSustain: TReal;
+		BasePropertyValue: TReal;
+		PropertyCenterBoost: TReal;
+		BuildingType: array of TBuildingType;
+		TotCommon: Integer;
+	end;
+
+	TNeighborhood = class
+		Nom: String;
+		NeighborhoodType: TNeighborhoodType;
+		CityBlock: array[-20..20, -20..20] of TCityBlockData;
+	end;
+
+function CubistTumorBuilding(const CityBlock: TCityBlockData): TBuildingData;
+function GenericBuilding(const CityBlock: TCityBlockData): TBuildingData;
+function GenSkyscraperBuilding(const CityBlock: TCityBlockData): TBuildingData;
+function ParkingBuilding(const CityBlock: TCityBlockData): TBuildingData;
+function SmallParkBuilding(const CityBlock: TCityBlockData): TBuildingData;
+
 procedure OffsetBuilding(var Wot: TBuildingData; Delta: T3Vector);
 procedure RenderBuilding(const Wot: TBuildingData);
 procedure RenderBuildingWithStyle(const Wot: TBuildingData; TarStyle: TPolyStyles);
@@ -181,7 +237,7 @@ begin
 	ConvertPoliesToSmallTex(Polies, SidewalkTex);
 end;
 
-function CubistTumorBuilding: TBuildingData;
+function CubistTumorBuilding(const CityBlock: TCityBlockData): TBuildingData;
 
 	function PerturbUp(N: TReal): TReal;
 	begin
@@ -249,7 +305,7 @@ begin
 	SetLength(ThisBlockPolies, 0);
 end;
 
-function GenericBuilding: TBuildingData;
+function GenericBuilding(const CityBlock: TCityBlockData): TBuildingData;
 var
 	ThisBlock: TBlockData;
 	ThisBlockPolies: TPolies;
@@ -267,7 +323,7 @@ begin
 	AppendPolies(Result.PolyData, ThisBlockPolies);
 end;
 
-function GenSkyscraperBuilding: TBuildingData;
+function GenSkyscraperBuilding(const CityBlock: TCityBlockData): TBuildingData;
 var
 	ThisBlock: TBlockData;
 	ThisBlockPolies: TPolies;
@@ -285,7 +341,7 @@ begin
 	AppendPolies(Result.PolyData, ThisBlockPolies);
 end;
 
-function ParkingBuilding: TBuildingData;
+function ParkingBuilding(const CityBlock: TCityBlockData): TBuildingData;
 var
 	ThisBlock: TBlockData;
 	ThisBlockPolies: TPolies;
@@ -323,7 +379,7 @@ begin
 	end;
 end;
 
-function SmallParkBuilding: TBuildingData;
+function SmallParkBuilding(const CityBlock: TCityBlockData): TBuildingData;
 var
 	ThisBlock: TBlockData;
 	ThisBlockPolies: TPolies;

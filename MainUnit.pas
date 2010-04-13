@@ -202,6 +202,7 @@ begin
 	FreeAndNil(ThisImage);
 end;
 
+{
 procedure NewBuildings;
 var
 	iX, iZ: Integer;
@@ -219,20 +220,21 @@ begin
 					PropertyValue := 192 + RandN(20) - Abs(iX) - Abs(iZ);
 
 					if PropertyValue > 200 then
-						Building := CubistTumorBuilding()
+						Building := CubistTumorBuilding(CityBlock[iX, iZ])
 					else if PropertyValue > 195 then
-						Building := GenSkyscraperBuilding()
+						Building := GenSkyscraperBuilding(CityBlock[iX, iZ])
 					else if PropertyValue = 191 then
-						Building := SmallParkBuilding()
+						Building := SmallParkBuilding(CityBlock[iX, iZ])
 					else if PropertyValue = 190 then
-						Building := ParkingBuilding()
+						Building := ParkingBuilding(CityBlock[iX, iZ])
 					else
-						Building := GenericBuilding()
+						Building := GenericBuilding(CityBlock[iX, iZ])
 					;
 					OffsetBuilding(Building, Vector(26*iX, 0, 26*iZ));
 				end
 	;
 end;
+}
 
 function ExtractMousePos: TPoint;
 var
@@ -394,7 +396,7 @@ begin
 		SDL_QUITEV: Done := True;
 		SDL_KEYDOWN: begin
 			if (event.key.keysym.sym = SDLK_Escape) and (KeyData.BuckyState = []) then Done := True;
-			if (event.key.keysym.sym = SDLK_Return) and (KeyData.BuckyState = []) then NewBuildings();
+			//if (event.key.keysym.sym = SDLK_Return) and (KeyData.BuckyState = []) then NewBuildings();
 			//if (event.key.keysym.sym = SDLK_S) and (KeyData.BuckyState = [bkCtrl]) then Player.DoSaveClick(event.key.keysym.sym);
 			if event.key.keysym.sym < 512 then KeyData.KeyDown[event.key.keysym.sym] := True;
 		end;
