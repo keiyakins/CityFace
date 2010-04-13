@@ -29,11 +29,7 @@ implementation
 
 uses
 	SysUtils, Math,
-	{$IFDEF Linux}
-		NixRandomity,
-	{$ELSE}
-		MTRandomity,
-	{$ENDIF}
+	Randomity,
 	GL, GLD, GLImages,
 	DUtils, D3Vectors,
 	SpaceTextures,
@@ -55,18 +51,11 @@ type
 		FM: array[0..15] of Single;
 	end;
 
-	TCityBlockData = record
-		PropertyValue: Byte;
-		Activity: TActivity;
-		Building: TBuildingData;
-	end;
-
 var
 	Rot: TReal;
 	Player: TPlayerData;
 	Camera: TCameraData;
 	FrameRate, SmoothedFrameRate: TReal;
-	CityBlock: array[-20..20, -20..20] of TCityBlockData;
 	MouseSensitivity: TReal;
 	bHasFocus: Boolean = True;
 
@@ -129,7 +118,7 @@ begin
 			ThatImage.Pixel[X, Y] := C;
 		end
 	;
-	BushyTex := ThatImage.BakeToL;
+	BushyTex := ThatImage.BakeToRGBA;
 	FreeAndNil(ThatImage);
 
 	//Lighten.
@@ -218,24 +207,30 @@ var
 	iX, iZ: Integer;
 
 begin
-	for iX := Low(CityBlock) to High(CityBlock) do
-		for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
-			with CityBlock[iX, iZ] do begin
-				PropertyValue := 192 + RandN(20) - Abs(iX) - Abs(iZ);
+	if Length(Neighborhood) = 0 then begin
+		SetLength(Neighborhood, 1);
+		Neighborhood[0] := TNeighborhood.Create;
+	end;
 
-				if PropertyValue > 200 then
-					Building := CubistTumorBuilding()
-				else if PropertyValue > 195 then
-					Building := GenSkyscraperBuilding()
-				else if PropertyValue = 191 then
-					Building := SmallParkBuilding()
-				else if PropertyValue = 190 then
-					Building := ParkingBuilding()
-				else
-					Building := GenericBuilding()
-				;
-				OffsetBuilding(Building, Vector(26*iX, 0, 26*iZ));
-			end
+	with Neighborhood[0] do
+		for iX := Low(CityBlock) to High(CityBlock) do
+			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
+				with CityBlock[iX, iZ] do begin
+					PropertyValue := 192 + RandN(20) - Abs(iX) - Abs(iZ);
+
+					if PropertyValue > 200 then
+						Building := CubistTumorBuilding()
+					else if PropertyValue > 195 then
+						Building := GenSkyscraperBuilding()
+					else if PropertyValue = 191 then
+						Building := SmallParkBuilding()
+					else if PropertyValue = 190 then
+						Building := ParkingBuilding()
+					else
+						Building := GenericBuilding()
+					;
+					OffsetBuilding(Building, Vector(26*iX, 0, 26*iZ));
+				end
 	;
 end;
 
@@ -329,6 +324,8 @@ begin
 	//glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, 1);
 	}
 
+	KeyData := TKeyData.Create;
+
 	LoadTexFont(MyFont, 'Verdana.ccf');
 
 	{
@@ -338,8 +335,10 @@ begin
 	GenProcTextures;
 	SetBoundTexture(0);
 
-	KeyData := TKeyData.Create;
-	NewBuildings;
+	LoadBuildScript;
+	//NewBuildings;
+	SetLength(Neighborhood, 1);
+	Neighborhood[0] := BuildNeighborhoodFromType(NeighborhoodType[0]);
 
 	Player.Loc := Vector(0, 0.5, 13);
 	Player.Facing.Z := -1;
@@ -352,8 +351,21 @@ begin
 end;
 
 procedure CleanupGame;
+var
+	I: Integer;
+
 begin
+	for I := 0 to High(Neighborhood) do FreeAndNil(Neighborhood[I]);
+	SetLength(Neighborhood, 0);
+	for I := 0 to High(NeighborhoodType) do FreeAndNil(NeighborhoodType[I]);
+	SetLength(NeighborhoodType, 0);
+	for I := 0 to High(Faction) do FreeAndNil(Faction[I]);
+	SetLength(Faction, 0);
+	for I := 0 to High(FactionType) do FreeAndNil(FactionType[I]);
+	SetLength(FactionType, 0);
+
 	FreeAndNil(KeyData);
+
 	glDeleteTextures(1, @WindowedTex);
 	glDeleteTextures(1, @RoofTex);
 	glDeleteTextures(1, @ConcreteTex);
@@ -384,11 +396,11 @@ begin
 			if (event.key.keysym.sym = SDLK_Escape) and (KeyData.BuckyState = []) then Done := True;
 			if (event.key.keysym.sym = SDLK_Return) and (KeyData.BuckyState = []) then NewBuildings();
 			//if (event.key.keysym.sym = SDLK_S) and (KeyData.BuckyState = [bkCtrl]) then Player.DoSaveClick(event.key.keysym.sym);
-			if event.key.keysym.sym < 512 then KeyData[event.key.keysym.sym] := True;
+			if event.key.keysym.sym < 512 then KeyData.KeyDown[event.key.keysym.sym] := True;
 		end;
-		SDL_KEYUP: if event.key.keysym.sym < 512 then KeyData[event.key.keysym.sym] := False;
-		SDL_MOUSEBUTTONDOWN: if Event.button.button < SDLK_BACKSPACE then KeyData[Event.button.button] := True;
-		SDL_MOUSEBUTTONUP  : if Event.button.button < SDLK_BACKSPACE then KeyData[Event.button.button] := False;
+		SDL_KEYUP: if event.key.keysym.sym < 512 then KeyData.KeyDown[event.key.keysym.sym] := False;
+		SDL_MOUSEBUTTONDOWN: if Event.button.button < SDLK_BACKSPACE then KeyData.KeyDown[Event.button.button] := True;
+		SDL_MOUSEBUTTONUP  : if Event.button.button < SDLK_BACKSPACE then KeyData.KeyDown[Event.button.button] := False;
 		//SDL_MOUSEMOTION: ;
 	end;
 end;
@@ -458,6 +470,7 @@ begin
 	if J.X <> 0 then VADD(Player.Loc, VProd(R, Player.Speed * J.X * fdT));
 	if J.Y <> 0 then VADD(Player.Loc, VProd(VY, Player.Speed * J.Y * fdT));
 	if J.Z <> 0 then VADD(Player.Loc, VProd(Camera.Facing, Player.Speed * J.Z * fdT));
+	KeyData.ClearPress;
 
 	//Move camera to player.
 	Camera.Loc := Player.Loc;
@@ -572,27 +585,29 @@ begin
 	end;
 end;
 
-procedure RenderNeighborhoodWithStyle(Style: TPolyStyles);
+procedure RenderNeighborhoodWithStyle(N: TNeighborhood; Style: TPolyStyles);
 var
 	iD, iX, iZ: Integer;
 
 begin
-	{//The naive implementation, in case the optimization becomes a problem.
-		for iX := Low(CityBlock) to High(CityBlock) do
-			for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
-				RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
-		;
-	}
+	with N do begin
+		{//The naive implementation, in case the optimization becomes a problem.
+			for iX := Low(CityBlock) to High(CityBlock) do
+				for iZ := Low(CityBlock[iX]) to High(CityBlock[iX]) do
+					RenderBuildingWithStyle(CityBlock[iX, iZ].Building, Style)
+			;
+		}
 
-	RenderBuildingWithStyle(CityBlock[0, 0].Building, Style);
-	for iD := 1 to 20 do begin
-		for iX := -iD to +iD do begin
-			RenderBuildingWithStyle(CityBlock[iX, -iD].Building, Style);
-			RenderBuildingWithStyle(CityBlock[iX, +iD].Building, Style);
-		end;
-		for iZ := -iD+1 to +iD-1 do begin
-			RenderBuildingWithStyle(CityBlock[-iD, iZ].Building, Style);
-			RenderBuildingWithStyle(CityBlock[+iD, iZ].Building, Style);
+		RenderBuildingWithStyle(CityBlock[0, 0].Building, Style);
+		for iD := 1 to 20 do begin
+			for iX := -iD to +iD do begin
+				RenderBuildingWithStyle(CityBlock[iX, -iD].Building, Style);
+				RenderBuildingWithStyle(CityBlock[iX, +iD].Building, Style);
+			end;
+			for iZ := -iD+1 to +iD-1 do begin
+				RenderBuildingWithStyle(CityBlock[-iD, iZ].Building, Style);
+				RenderBuildingWithStyle(CityBlock[+iD, iZ].Building, Style);
+			end;
 		end;
 	end;
 end;
@@ -614,9 +629,9 @@ begin
 		//`@ Eventually, we should split the polies by texture and style.
 		//`@ And then sort the closest to the camera first.
 		glDisable(GL_LIGHTING);
-		RenderNeighborhoodWithStyle([]);
+		RenderNeighborhoodWithStyle(Neighborhood[0], []);
 		glEnable(GL_LIGHTING);
-		RenderNeighborhoodWithStyle([psLit]);
+		RenderNeighborhoodWithStyle(Neighborhood[0], [psLit]);
 		SetBoundTexture(AsphaltTex);
 		//SetBoundTexture(ConcreteTex);
 		glBegin(GL_QUADS);

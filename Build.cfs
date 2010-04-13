@@ -1,4 +1,4 @@
-FactionType PlayerSIN:
+FactionType = PlayerSIN:
 end FactionType
 
 FactionType = Yakuza:
