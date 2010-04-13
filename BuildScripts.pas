@@ -296,6 +296,7 @@ begin
 	Result.Common := 1;
 	Result.PriceFactor := 1;
 	Result.bSINlessOK := RandBit;
+	Result.BuildFunc := GenericBuilding;
 	ParsedAction := ParseScript(ScriptLin);
 
 	for PAI := 0 to High(ParsedAction) do with ParsedAction[PAI] do begin
