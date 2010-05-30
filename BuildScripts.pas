@@ -47,7 +47,7 @@ var
 	I, J, oJ: Integer;
 
 begin
-	Buf := DumpFileToString('Build.cfs') + #0;
+	Buf := DumpFileToString(FN) + #0;
 	//Convert CRLFs, CRs, and LFs to NULs.
 	Buf := StringReplace(Buf, #13#10, #0, [rfReplaceAll]);
 	Buf := StringReplaceC(Buf, #13, #0);
